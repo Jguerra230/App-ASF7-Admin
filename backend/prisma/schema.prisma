@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ChampionshipStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
+}
+
+enum ChampionshipFormat {
+  KNOCKOUT
+  GROUPS
+  GROUPS_KNOCKOUT
+}
+
+enum PlayerPosition {
+  GK
+  DEF
+  MID
+  ATA
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  CANCELED
+}
+
+enum VoteType {
+  MVP
+  GOAL
+}
+
+enum FantasyAction {
+  GOAL
+  ASSIST
+  SAVE
+  FOUL_COMMITTED
+  FOUL_SUFFERED
+  YELLOW
+  RED
+  SHOT_ON_TARGET
+  SHOT_ON_POST
+}
+
+model User {
+  id               String   @id @default(uuid())
+  name             String
+  email            String   @unique
+  password         String
+  role             Role     @default(USER)
+  refreshTokenHash String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  pollVotes PollVote[]
+  votes     Vote[]
+}
+
+model News {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  images    String[]
+  featured  Boolean  @default(false)
+  published Boolean  @default(false)
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Banner {
+  id         String   @id @default(uuid())
+  title      String
+  imageUrl   String
+  linkTarget String?
+  order      Int      @default(0)
+  active     Boolean  @default(true)
+  startAt    DateTime?
+  endAt      DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Poll {
+  id        String       @id @default(uuid())
+  question  String
+  isActive  Boolean      @default(true)
+  options   PollOption[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model PollOption {
+  id     String     @id @default(uuid())
+  pollId String
+  text   String
+  votes  PollVote[]
+
+  poll Poll @relation(fields: [pollId], references: [id])
+}
+
+model PollVote {
+  id        String   @id @default(uuid())
+  pollId    String
+  optionId  String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  poll   Poll       @relation(fields: [pollId], references: [id])
+  option PollOption @relation(fields: [optionId], references: [id])
+  user   User?      @relation(fields: [userId], references: [id])
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  type      VoteType
+  playerId  String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+}
+
+model TvConfig {
+  id                String   @id @default(uuid())
+  youtubeChannelUrl String
+  liveUrl           String?
+  playlists         String[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Championship {
+  id               String             @id @default(uuid())
+  name             String
+  season           String
+  status           ChampionshipStatus @default(DRAFT)
+  format           ChampionshipFormat
+  groupsNumber     Int?
+  qualifiersNumber Int?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  teams  Team[]
+  rounds Round[]
+}
+
+model Team {
+  id             String   @id @default(uuid())
+  name           String
+  crestUrl       String?
+  championshipId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  championship Championship @relation(fields: [championshipId], references: [id])
+  players      Player[]
+}
+
+model Player {
+  id        String         @id @default(uuid())
+  name      String
+  position  PlayerPosition
+  photoUrl  String?
+  teamId    String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  team        Team          @relation(fields: [teamId], references: [id])
+  matchStats  MatchStats[]
+  votes       Vote[]
+  fantasy     FantasyPrice?
+}
+
+model Round {
+  id             String   @id @default(uuid())
+  name           String
+  number         Int
+  championshipId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  championship Championship @relation(fields: [championshipId], references: [id])
+  matches      Match[]
+}
+
+model Match {
+  id          String      @id @default(uuid())
+  roundId     String
+  homeTeamId  String
+  awayTeamId  String
+  homeScore   Int         @default(0)
+  awayScore   Int         @default(0)
+  status      MatchStatus @default(SCHEDULED)
+  scheduledAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  round    Round     @relation(fields: [roundId], references: [id])
+  homeTeam Team      @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam Team      @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  stats    MatchStats[]
+}
+
+model MatchStats {
+  id            String   @id @default(uuid())
+  matchId       String
+  playerId      String
+  goals         Int      @default(0)
+  assists       Int      @default(0)
+  yellowCards   Int      @default(0)
+  redCards      Int      @default(0)
+  saves         Int      @default(0)
+  fouls         Int      @default(0)
+  shotsOnTarget Int      @default(0)
+  shotsOnPost   Int      @default(0)
+
+  match  Match  @relation(fields: [matchId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+model FantasyConfig {
+  id            String   @id @default(uuid())
+  initialBudget Int      @default(100)
+  gkCount       Int      @default(1)
+  defCount      Int      @default(2)
+  midCount      Int      @default(2)
+  ataCount      Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FantasyPrice {
+  id       String @id @default(uuid())
+  playerId String @unique
+  price    Int
+
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+model FantasyScore {
+  id     String        @id @default(uuid())
+  action FantasyAction @unique
+  points Int
+}
